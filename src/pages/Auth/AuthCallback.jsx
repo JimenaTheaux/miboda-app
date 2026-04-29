@@ -11,27 +11,21 @@ export default function AuthCallback() {
   useEffect(() => {
     async function handleCallback() {
       try {
-        const params = new URLSearchParams(window.location.search)
-        const code = params.get('code')
-        const eventIdFromInvite = params.get('event_id')
+        // Con implicit flow, el cliente detecta el token del hash automáticamente.
+        // Esperamos un tick para que Supabase procese la URL antes de getSession.
+        await new Promise((r) => setTimeout(r, 100))
 
-        let session = null
+        const { data, error } = await supabase.auth.getSession()
+        if (error) throw error
 
-        if (code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-          if (error) throw error
-          session = data.session
-        }
-
-        if (!session) {
-          const { data, error } = await supabase.auth.getSession()
-          if (error) throw error
-          session = data.session
-        }
-
+        const session = data.session
         if (!session?.user) { navigate('/login', { replace: true }); return }
 
         setUser(session.user)
+
+        // Si viene un event_id en la URL (invitación a novia 2)
+        const params = new URLSearchParams(window.location.search)
+        const eventIdFromInvite = params.get('event_id')
 
         if (eventIdFromInvite) {
           const { data: existing } = await supabase
