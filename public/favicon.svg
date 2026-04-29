@@ -1,5 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <rect width="100" height="100" rx="22" fill="#5C1F2E"/>
-  <text x="50" y="66" font-size="36" text-anchor="middle" fill="#FDFAF6"
-        font-family="Georgia, serif" font-style="italic" font-weight="700">MB</text>
+  <g transform="translate(50,50)">
+    <!-- 6 petals -->
+    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(0)"/>
+    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(60)"/>
+    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(120)"/>
+    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(180)"/>
+    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(240)"/>
+    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(300)"/>
+    <!-- Centro dorado -->
+    <circle cx="0" cy="0" r="10" fill="#B8965A"/>
+    <circle cx="0" cy="0" r="5" fill="#FDFAF6" opacity="0.45"/>
+  </g>
 </svg>
