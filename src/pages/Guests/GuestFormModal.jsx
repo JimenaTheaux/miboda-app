@@ -51,7 +51,7 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
   const selectCls = 'input-base appearance-none'
 
   return (
-    <div className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`}>
+    <div className={`fixed inset-0 z-[60] ${open ? '' : 'pointer-events-none'}`}>
       <div
         className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
@@ -78,7 +78,7 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="px-5 py-4 space-y-4 pb-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="px-5 py-4 space-y-4 pb-14">
 
           <div>
             <label className={labelCls}>Nombre completo</label>

@@ -62,9 +62,9 @@ export default function ChecklistItemFormModal({ open, onClose, item, onSaved, b
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-surface rounded-t-2xl md:rounded-2xl shadow-xl p-6 pb-8">
+      <div className="relative w-full max-w-md bg-surface rounded-t-2xl md:rounded-2xl shadow-xl p-6 pb-14 md:pb-8">
 
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-serif text-bordo text-xl">{item ? 'Editar tarea' : 'Nueva tarea'}</h2>
