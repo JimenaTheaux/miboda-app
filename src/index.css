@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background-color: #FDFBFB;
+    color: #1A0F12;
+    -webkit-font-smoothing: antialiased;
+  }
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .input-base {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid #E8D8DC;
+    background-color: #F5EFF0;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    color: #1A0F12;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input-base::placeholder {
+    color: rgba(122, 90, 100, 0.45);
+  }
+  .input-base:focus {
+    outline: none;
+    border-color: #5C1F2E;
+    box-shadow: 0 0 0 2px rgba(92, 31, 46, 0.2);
+  }
+
+  .btn-primary {
+    background-color: #5C1F2E;
+    color: #FDFBFB;
+    border-radius: 0.75rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.15s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    cursor: pointer;
+  }
+  .btn-primary:hover {
+    background-color: #7D2E40;
+  }
+  .btn-primary:active {
+    transform: scale(0.97);
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .card {
+    background-color: #F5EFF0;
+    border: 1px solid #E8D8DC;
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
