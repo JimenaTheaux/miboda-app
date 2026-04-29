@@ -2,18 +2,24 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import useAppStore from '../../store/useAppStore'
+import { PRESET_CATS } from '../Guests/GuestFormModal'
+
+function catLabel(val) {
+  return PRESET_CATS.find((c) => c.value === val)?.label ?? val
+}
 
 export default function AssignGuestsModal({ open, onClose, table, onSaved }) {
   const { eventId } = useAppStore()
-  const [search, setSearch] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [search, setSearch]     = useState('')
+  const [filterCat, setFilterCat] = useState('todos')
+  const [saving, setSaving]     = useState(false)
 
   const { data: guests = [], refetch } = useQuery({
     queryKey: ['guests-for-assign', eventId],
     queryFn: async () => {
       const { data } = await supabase
         .from('guests')
-        .select('id, full_name, table_id, tables(name)')
+        .select('id, full_name, table_id, category, tables(name)')
         .eq('event_id', eventId)
         .order('full_name', { ascending: true })
       return data ?? []
@@ -21,35 +27,38 @@ export default function AssignGuestsModal({ open, onClose, table, onSaved }) {
     enabled: open && !!eventId,
   })
 
-  const atThisTable = useMemo(
-    () => guests.filter((g) => g.table_id === table?.id),
-    [guests, table]
-  )
-  const unassigned = useMemo(
-    () => guests.filter((g) => !g.table_id),
-    [guests]
-  )
-  const atOtherTable = useMemo(
-    () => guests.filter((g) => g.table_id && g.table_id !== table?.id),
-    [guests, table]
-  )
+  const atThisTable  = useMemo(() => guests.filter((g) => g.table_id === table?.id), [guests, table])
+  const unassigned   = useMemo(() => guests.filter((g) => !g.table_id), [guests])
+  const atOtherTable = useMemo(() => guests.filter((g) => g.table_id && g.table_id !== table?.id), [guests, table])
 
-  const filteredUnassigned = useMemo(() => {
-    if (!search.trim()) return unassigned
-    const q = search.toLowerCase()
-    return unassigned.filter((g) => g.full_name.toLowerCase().includes(q))
-  }, [unassigned, search])
+  // Dynamic category options from all guests (not just unassigned)
+  const catOptions = useMemo(() => {
+    const used = [...new Set(guests.map((g) => g.category).filter(Boolean))].sort()
+    return [
+      { value: 'todos', label: 'Todos' },
+      ...used.map((v) => ({ value: v, label: catLabel(v) })),
+    ]
+  }, [guests])
 
-  const filteredOther = useMemo(() => {
-    if (!search.trim()) return atOtherTable
-    const q = search.toLowerCase()
-    return atOtherTable.filter((g) => g.full_name.toLowerCase().includes(q))
-  }, [atOtherTable, search])
+  function applyFilters(list) {
+    let result = list
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter((g) => g.full_name.toLowerCase().includes(q))
+    }
+    if (filterCat !== 'todos') {
+      result = result.filter((g) => g.category === filterCat)
+    }
+    return result
+  }
 
-  const seated = atThisTable.length
+  const filteredUnassigned = useMemo(() => applyFilters(unassigned), [unassigned, search, filterCat])
+  const filteredOther      = useMemo(() => applyFilters(atOtherTable), [atOtherTable, search, filterCat])
+
+  const seated   = atThisTable.length
   const capacity = table?.capacity ?? 0
-  const pct = capacity > 0 ? Math.min(100, Math.round((seated / capacity) * 100)) : 0
-  const isFull = seated >= capacity
+  const pct      = capacity > 0 ? Math.min(100, Math.round((seated / capacity) * 100)) : 0
+  const isFull   = seated >= capacity
 
   async function assign(guestId) {
     if (isFull) return
@@ -71,7 +80,7 @@ export default function AssignGuestsModal({ open, onClose, table, onSaved }) {
   if (!open || !table) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-surface rounded-t-2xl md:rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
 
@@ -89,30 +98,38 @@ export default function AssignGuestsModal({ open, onClose, table, onSaved }) {
         </div>
 
         {/* Capacity bar */}
-        <div className="px-6 pb-4 flex-shrink-0">
+        <div className="px-6 pb-3 flex-shrink-0">
           <div className="h-1.5 bg-border rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${pct}%`,
-                backgroundColor: pct >= 100 ? '#5C1F2E' : pct >= 80 ? '#B8965A' : '#6B8070',
-              }}
-            />
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${pct}%`, backgroundColor: pct >= 100 ? '#5C1F2E' : pct >= 80 ? '#B8965A' : '#6B8070' }} />
           </div>
         </div>
 
         {/* Search */}
-        <div className="px-6 pb-3 flex-shrink-0">
-          <input
-            className="input-base"
-            placeholder="Buscar invitado..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="px-6 pb-2 flex-shrink-0">
+          <input className="input-base" placeholder="Buscar invitado..."
+            value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
+        {/* Category filter — solo si hay más de una categoría */}
+        {catOptions.length > 1 && (
+          <div className="px-6 pb-3 flex-shrink-0">
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5">
+              {catOptions.map((opt) => (
+                <button key={opt.value} onClick={() => setFilterCat(opt.value)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                    filterCat === opt.value
+                      ? 'bg-bordo text-white'
+                      : 'bg-surface-2 border border-border text-ink-soft hover:text-ink'
+                  }`}
+                >{opt.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Scrollable list */}
-        <div className="overflow-y-auto flex-1 px-6 pb-6 space-y-4">
+        <div className="overflow-y-auto flex-1 px-6 pb-8 space-y-4">
 
           {/* At this table */}
           {atThisTable.length > 0 && (
@@ -124,12 +141,14 @@ export default function AssignGuestsModal({ open, onClose, table, onSaved }) {
                 {atThisTable.map((g) => (
                   <div key={g.id} className="flex items-center gap-3 card py-2.5">
                     <div className="w-2 h-2 rounded-full bg-sage flex-shrink-0" />
-                    <span className="flex-1 text-sm text-ink">{g.full_name}</span>
-                    <button
-                      disabled={saving}
-                      onClick={() => unassign(g.id)}
-                      className="text-xs text-red-400 hover:text-red-600 transition flex-shrink-0"
-                    >
+                    <span className="flex-1 text-sm text-ink truncate">{g.full_name}</span>
+                    {g.category && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-bordo-pale text-bordo-light flex-shrink-0">
+                        {catLabel(g.category)}
+                      </span>
+                    )}
+                    <button disabled={saving} onClick={() => unassign(g.id)}
+                      className="text-xs text-red-400 hover:text-red-600 transition flex-shrink-0">
                       Quitar
                     </button>
                   </div>
@@ -148,18 +167,17 @@ export default function AssignGuestsModal({ open, onClose, table, onSaved }) {
                 {filteredUnassigned.map((g) => (
                   <div key={g.id} className="flex items-center gap-3 card py-2.5">
                     <div className="w-2 h-2 rounded-full bg-border flex-shrink-0" />
-                    <span className="flex-1 text-sm text-ink">{g.full_name}</span>
-                    <button
-                      disabled={saving || isFull}
-                      onClick={() => assign(g.id)}
+                    <span className="flex-1 text-sm text-ink truncate">{g.full_name}</span>
+                    {g.category && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-bordo-pale text-bordo-light flex-shrink-0">
+                        {catLabel(g.category)}
+                      </span>
+                    )}
+                    <button disabled={saving || isFull} onClick={() => assign(g.id)}
                       className={`text-xs font-medium transition flex-shrink-0 ${
-                        isFull
-                          ? 'text-ink-soft cursor-not-allowed'
-                          : 'text-bordo hover:text-bordo-mid'
+                        isFull ? 'text-ink-soft cursor-not-allowed' : 'text-bordo hover:text-bordo-mid'
                       }`}
-                    >
-                      {isFull ? 'Mesa llena' : 'Asignar'}
-                    </button>
+                    >{isFull ? 'Mesa llena' : 'Asignar'}</button>
                   </div>
                 ))}
               </div>
@@ -176,7 +194,12 @@ export default function AssignGuestsModal({ open, onClose, table, onSaved }) {
                 {filteredOther.map((g) => (
                   <div key={g.id} className="flex items-center gap-3 card py-2.5 opacity-60">
                     <div className="w-2 h-2 rounded-full bg-gold flex-shrink-0" />
-                    <span className="flex-1 text-sm text-ink">{g.full_name}</span>
+                    <span className="flex-1 text-sm text-ink truncate">{g.full_name}</span>
+                    {g.category && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-bordo-pale text-bordo-light flex-shrink-0">
+                        {catLabel(g.category)}
+                      </span>
+                    )}
                     <span className="text-[11px] text-ink-soft flex-shrink-0">{g.tables?.name}</span>
                   </div>
                 ))}

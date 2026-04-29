@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 import useAppStore from '../../store/useAppStore'
-import GuestFormModal from './GuestFormModal'
+import GuestFormModal, { PRESET_CATS } from './GuestFormModal'
 
 const STATUS = {
   confirmado: { label: 'Confirmado', cls: 'bg-sage-pale text-sage' },
@@ -20,6 +20,10 @@ const AGE_VALUES     = ['adulto', 'adolescente', 'nino']
 const STATUS_VALUES  = ['pendiente', 'confirmado', 'no_asiste']
 const INVITED_VALUES = ['novia1', 'novia2', 'ambas']
 const MENU_VALUES    = ['adulto', 'infantil']
+
+function catLabel(val) {
+  return PRESET_CATS.find((c) => c.value === val)?.label ?? val
+}
 
 function StatusBadge({ status }) {
   const c = STATUS[status] ?? STATUS.pendiente
@@ -48,7 +52,7 @@ function FilterChips({ options, value, onChange }) {
 function ImportModal({ open, onClose, onConfirm, rows, loading }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-surface rounded-t-2xl w-full max-w-lg p-5 pb-8">
         <div className="flex justify-center mb-3">
@@ -56,7 +60,7 @@ function ImportModal({ open, onClose, onConfirm, rows, loading }) {
         </div>
         <h2 className="font-semibold text-ink mb-1">Importar invitados</h2>
         <p className="text-ink-soft text-sm mb-4">
-          Se van a importar <span className="font-semibold text-bordo">{rows.length} invitados</span>. Revisá que el archivo esté bien antes de confirmar.
+          Se van a importar <span className="font-semibold text-bordo">{rows.length} invitados</span>. Revisá antes de confirmar.
         </p>
         <div className="bg-surface-2 rounded-xl divide-y divide-border max-h-52 overflow-y-auto mb-4">
           {rows.slice(0, 20).map((r, i) => (
@@ -90,6 +94,7 @@ export default function GuestsPage() {
   const [filterStatus, setFilterStatus]       = useState('todos')
   const [filterAge, setFilterAge]             = useState('todos')
   const [filterInvitedBy, setFilterInvitedBy] = useState('todos')
+  const [filterCat, setFilterCat]             = useState('todos')
   const [importRows, setImportRows]   = useState([])
   const [importOpen, setImportOpen]   = useState(false)
   const [importing, setImporting]     = useState(false)
@@ -109,38 +114,40 @@ export default function GuestsPage() {
     queryClient.invalidateQueries({ queryKey: ['guests', eventId] })
     queryClient.invalidateQueries({ queryKey: ['confirmed-guests', eventId] })
     queryClient.invalidateQueries({ queryKey: ['recent-guests-dash', eventId] })
+    queryClient.invalidateQueries({ queryKey: ['guests-for-assign', eventId] })
   }
+
+  // ── Category filter options (dynamic from data) ──────────────────────────
+  const catOptions = useMemo(() => {
+    const used = [...new Set(guests.map((g) => g.category).filter(Boolean))].sort()
+    return [
+      { value: 'todos', label: 'Todas' },
+      { value: '__sin__', label: 'Sin categoría' },
+      ...used.map((v) => ({ value: v, label: catLabel(v) })),
+    ]
+  }, [guests])
 
   // ── Export ───────────────────────────────────────────────────────────────
   function handleExport() {
     const HEADERS = [
-      'Nombre completo',
-      'Edad',
-      'Estado',
-      'Invitado por',
-      'Menú',
-      'Restricciones alimentarias',
+      'Nombre completo', 'Categoría', 'Edad', 'Estado',
+      'Invitado por', 'Menú', 'Restricciones alimentarias',
     ]
     const HINTS = [
       '(texto libre)',
+      '(familia | amigos | trabajo | parejas_amigos | otros | texto libre)',
       '(adulto | adolescente | nino)',
       '(pendiente | confirmado | no_asiste)',
       '(novia1 | novia2 | ambas)',
       '(adulto | infantil)',
       '(texto libre, opcional)',
     ]
-
     const dataRows = guests.map((g) => [
-      g.full_name,
-      g.age_group,
-      g.status,
-      g.invited_by,
-      g.menu,
-      g.dietary_notes ?? '',
+      g.full_name, g.category ?? '', g.age_group, g.status,
+      g.invited_by, g.menu, g.dietary_notes ?? '',
     ])
-
     const ws = XLSX.utils.aoa_to_sheet([HEADERS, HINTS, ...dataRows])
-    ws['!cols'] = [{ wch: 28 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 30 }]
+    ws['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 30 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Invitados')
     XLSX.writeFile(wb, 'invitados-miboda.xlsx')
@@ -151,31 +158,27 @@ export default function GuestsPage() {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
-
     const buffer = await file.arrayBuffer()
     const wb = XLSX.read(buffer)
     const ws = wb.Sheets[wb.SheetNames[0]]
     const allRows = XLSX.utils.sheet_to_json(ws, { header: 1 })
 
-    // Skip header + hints rows (first 2), filter blank and hint rows
     const parsed = allRows
       .slice(1)
       .filter((row) => row[0] && typeof row[0] === 'string' && !String(row[0]).startsWith('('))
       .map((row) => ({
-        full_name:       String(row[0] ?? '').trim(),
-        age_group:       AGE_VALUES.includes(row[1])     ? row[1]     : 'adulto',
-        status:          STATUS_VALUES.includes(row[2])  ? row[2]     : 'pendiente',
-        invited_by:      INVITED_VALUES.includes(row[3]) ? row[3]     : 'ambas',
-        menu:            MENU_VALUES.includes(row[4])    ? row[4]     : 'adulto',
-        dietary_notes:   row[5] ? String(row[5]).trim() || null : null,
-        event_id:        eventId,
+        full_name:      String(row[0] ?? '').trim(),
+        category:       row[1] ? String(row[1]).trim() || null : null,
+        age_group:      AGE_VALUES.includes(row[2])     ? row[2] : 'adulto',
+        status:         STATUS_VALUES.includes(row[3])  ? row[3] : 'pendiente',
+        invited_by:     INVITED_VALUES.includes(row[4]) ? row[4] : 'ambas',
+        menu:           MENU_VALUES.includes(row[5])    ? row[5] : 'adulto',
+        dietary_notes:  row[6] ? String(row[6]).trim() || null : null,
+        event_id:       eventId,
       }))
       .filter((g) => g.full_name)
 
-    if (parsed.length === 0) {
-      alert('No se encontraron filas válidas en el archivo.')
-      return
-    }
+    if (parsed.length === 0) { alert('No se encontraron filas válidas.'); return }
     setImportRows(parsed)
     setImportOpen(true)
   }
@@ -194,8 +197,10 @@ export default function GuestsPage() {
     if (filterStatus !== 'todos' && g.status !== filterStatus) return false
     if (filterAge !== 'todos' && g.age_group !== filterAge) return false
     if (filterInvitedBy !== 'todos' && g.invited_by !== filterInvitedBy) return false
+    if (filterCat === '__sin__' && g.category) return false
+    if (filterCat !== 'todos' && filterCat !== '__sin__' && g.category !== filterCat) return false
     return true
-  }), [guests, filterStatus, filterAge, filterInvitedBy])
+  }), [guests, filterStatus, filterAge, filterInvitedBy, filterCat])
 
   const total     = guests.length
   const confirmed = guests.filter((g) => g.status === 'confirmado').length
@@ -208,34 +213,23 @@ export default function GuestsPage() {
         <div className="flex items-end justify-between">
           <h1 className="font-serif text-white text-3xl">Invitados</h1>
           <div className="flex items-center gap-2">
-            {/* Exportar */}
-            <button
-              onClick={handleExport}
-              title="Exportar Excel"
-              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95"
-            >
+            <button onClick={handleExport} title="Exportar Excel"
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
               </svg>
               Excel
             </button>
-            {/* Importar */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              title="Importar desde Excel"
-              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95"
-            >
+            <button onClick={() => fileInputRef.current?.click()} title="Importar desde Excel"
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5m0 0L7.5 12m4.5-4.5V21" />
               </svg>
               Importar
             </button>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
-            {/* Agregar */}
-            <button
-              onClick={() => { setEditingGuest(null); setModalOpen(true) }}
-              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95"
-            >
+            <button onClick={() => { setEditingGuest(null); setModalOpen(true) }}
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
@@ -281,6 +275,9 @@ export default function GuestsPage() {
             { value: 'novia2', label: bride2 },
             { value: 'ambas', label: 'Ambas' },
           ]} />
+          {catOptions.length > 2 && (
+            <FilterChips value={filterCat} onChange={setFilterCat} options={catOptions} />
+          )}
         </div>
 
         {/* Lista */}
@@ -309,11 +306,18 @@ export default function GuestsPage() {
                     <span className="font-medium text-ink text-sm leading-none">{guest.full_name}</span>
                     <AgeGroupBadge ageGroup={guest.age_group} />
                   </div>
-                  <p className="text-xs text-ink-soft">
-                    {guest.tables?.name ?? 'Sin mesa'}
-                    {' · '}Menú {guest.menu === 'infantil' ? 'infantil' : 'adulto'}
-                    {guest.dietary_notes ? ' · ⚠️' : ''}
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {guest.category && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-bordo-pale text-bordo-light">
+                        {catLabel(guest.category)}
+                      </span>
+                    )}
+                    <span className="text-xs text-ink-soft">
+                      {guest.tables?.name ?? 'Sin mesa'}
+                      {' · '}Menú {guest.menu === 'infantil' ? 'infantil' : 'adulto'}
+                      {guest.dietary_notes ? ' · ⚠️' : ''}
+                    </span>
+                  </div>
                 </div>
                 <StatusBadge status={guest.status} />
               </button>

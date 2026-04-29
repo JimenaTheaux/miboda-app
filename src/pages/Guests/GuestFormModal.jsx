@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../../lib/supabase'
 import useAppStore from '../../store/useAppStore'
@@ -8,16 +8,29 @@ const DEFAULTS = {
   invited_by: 'ambas', menu: 'adulto', dietary_notes: '',
 }
 
+export const PRESET_CATS = [
+  { value: 'familia',        label: 'Familia' },
+  { value: 'amigos',         label: 'Amigos' },
+  { value: 'trabajo',        label: 'Trabajo' },
+  { value: 'parejas_amigos', label: 'Parejas de amigos' },
+  { value: 'otros',          label: 'Otros' },
+]
+const PRESET_VALUES = PRESET_CATS.map((c) => c.value)
+
 export default function GuestFormModal({ open, onClose, guest, onSaved }) {
   const { eventId, event } = useAppStore()
   const bride1 = event?.bride1_name || 'Novia 1'
   const bride2 = event?.bride2_name || 'Novia 2'
-  const isEditing = !!guest
 
   const { register, handleSubmit, reset, watch, setValue,
     formState: { errors, isSubmitting } } = useForm({ defaultValues: DEFAULTS })
 
+  const [catValue, setCatValue]     = useState('')
+  const [customCat, setCustomCat]   = useState('')
+  const [showCustom, setShowCustom] = useState(false)
+
   const ageGroup = watch('age_group')
+  const isEditing = !!guest
 
   useEffect(() => {
     if (!open) return
@@ -25,6 +38,17 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
       full_name: guest.full_name, age_group: guest.age_group, status: guest.status,
       invited_by: guest.invited_by, menu: guest.menu, dietary_notes: guest.dietary_notes ?? '',
     } : DEFAULTS)
+
+    const cat = guest?.category ?? ''
+    if (cat && !PRESET_VALUES.includes(cat)) {
+      setCatValue('__custom__')
+      setShowCustom(true)
+      setCustomCat(cat)
+    } else {
+      setCatValue(cat)
+      setShowCustom(false)
+      setCustomCat('')
+    }
   }, [open, guest])
 
   useEffect(() => {
@@ -32,11 +56,23 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
     else setValue('menu', 'adulto')
   }, [ageGroup])
 
+  function handleCatChange(e) {
+    const val = e.target.value
+    setCatValue(val)
+    setShowCustom(val === '__custom__')
+    if (val !== '__custom__') setCustomCat('')
+  }
+
   async function onSubmit(data) {
+    const category = showCustom
+      ? (customCat.trim() || null)
+      : (catValue || null)
+
     const payload = {
       full_name: data.full_name.trim(), age_group: data.age_group,
       status: data.status, invited_by: data.invited_by, menu: data.menu,
       dietary_notes: data.dietary_notes?.trim() || null,
+      category,
     }
     if (isEditing) await supabase.from('guests').update(payload).eq('id', guest.id)
     else await supabase.from('guests').insert({ ...payload, event_id: eventId })
@@ -63,12 +99,10 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
           open ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
-        {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-border rounded-full" />
         </div>
 
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border">
           <h2 className="font-semibold text-ink">
             {isEditing ? 'Editar invitado' : 'Agregar invitado'}
@@ -87,6 +121,28 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
             <input {...register('full_name', { required: 'Ingresá el nombre' })}
               type="text" placeholder="Ana García" className="input-base" />
             {errors.full_name && <p className="text-red-500 text-xs mt-1">{errors.full_name.message}</p>}
+          </div>
+
+          {/* Categoría */}
+          <div>
+            <label className={labelCls}>Categoría</label>
+            <select value={catValue} onChange={handleCatChange} className={selectCls}>
+              <option value="">Sin categoría</option>
+              {PRESET_CATS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+              <option value="__custom__">Otra categoría...</option>
+            </select>
+            {showCustom && (
+              <input
+                type="text"
+                value={customCat}
+                onChange={(e) => setCustomCat(e.target.value)}
+                placeholder="Escribí la categoría"
+                className="input-base mt-2"
+                autoFocus
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
