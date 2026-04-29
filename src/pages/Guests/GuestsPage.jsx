@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 import useAppStore from '../../store/useAppStore'
 import GuestFormModal from './GuestFormModal'
@@ -14,6 +15,11 @@ const AGE = {
   adolescente: { label: 'Adol.',   cls: 'bg-bordo-pale text-bordo-light' },
   nino:        { label: 'Niño',    cls: 'bg-sage-pale text-sage' },
 }
+
+const AGE_VALUES     = ['adulto', 'adolescente', 'nino']
+const STATUS_VALUES  = ['pendiente', 'confirmado', 'no_asiste']
+const INVITED_VALUES = ['novia1', 'novia2', 'ambas']
+const MENU_VALUES    = ['adulto', 'infantil']
 
 function StatusBadge({ status }) {
   const c = STATUS[status] ?? STATUS.pendiente
@@ -39,14 +45,52 @@ function FilterChips({ options, value, onChange }) {
   )
 }
 
+function ImportModal({ open, onClose, onConfirm, rows, loading }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-surface rounded-t-2xl w-full max-w-lg p-5 pb-8">
+        <div className="flex justify-center mb-3">
+          <div className="w-10 h-1 bg-border rounded-full" />
+        </div>
+        <h2 className="font-semibold text-ink mb-1">Importar invitados</h2>
+        <p className="text-ink-soft text-sm mb-4">
+          Se van a importar <span className="font-semibold text-bordo">{rows.length} invitados</span>. Revisá que el archivo esté bien antes de confirmar.
+        </p>
+        <div className="bg-surface-2 rounded-xl divide-y divide-border max-h-52 overflow-y-auto mb-4">
+          {rows.slice(0, 20).map((r, i) => (
+            <div key={i} className="px-3 py-2 flex items-center gap-2 text-sm">
+              <span className="flex-1 font-medium text-ink truncate">{r.full_name}</span>
+              <span className="text-xs text-ink-soft">{r.age_group} · {r.status}</span>
+            </div>
+          ))}
+          {rows.length > 20 && (
+            <div className="px-3 py-2 text-xs text-ink-soft text-center">...y {rows.length - 20} más</div>
+          )}
+        </div>
+        <button onClick={onConfirm} disabled={loading} className="btn-primary w-full mb-2">
+          {loading ? 'Importando...' : `Importar ${rows.length} invitados`}
+        </button>
+        <button onClick={onClose} className="w-full text-center text-sm text-ink-soft py-2">Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
 export default function GuestsPage() {
   const { eventId } = useAppStore()
   const queryClient = useQueryClient()
+  const fileInputRef = useRef(null)
+
   const [modalOpen, setModalOpen]       = useState(false)
   const [editingGuest, setEditingGuest] = useState(null)
   const [filterStatus, setFilterStatus]       = useState('todos')
   const [filterAge, setFilterAge]             = useState('todos')
   const [filterInvitedBy, setFilterInvitedBy] = useState('todos')
+  const [importRows, setImportRows]   = useState([])
+  const [importOpen, setImportOpen]   = useState(false)
+  const [importing, setImporting]     = useState(false)
 
   const { data: guests = [], isLoading } = useQuery({
     queryKey: ['guests', eventId],
@@ -59,12 +103,91 @@ export default function GuestsPage() {
     enabled: !!eventId,
   })
 
-  function handleSaved() {
+  function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['guests', eventId] })
     queryClient.invalidateQueries({ queryKey: ['confirmed-guests', eventId] })
     queryClient.invalidateQueries({ queryKey: ['recent-guests-dash', eventId] })
   }
 
+  // ── Export ───────────────────────────────────────────────────────────────
+  function handleExport() {
+    const HEADERS = [
+      'Nombre completo',
+      'Edad',
+      'Estado',
+      'Invitado por',
+      'Menú',
+      'Restricciones alimentarias',
+    ]
+    const HINTS = [
+      '(texto libre)',
+      '(adulto | adolescente | nino)',
+      '(pendiente | confirmado | no_asiste)',
+      '(novia1 | novia2 | ambas)',
+      '(adulto | infantil)',
+      '(texto libre, opcional)',
+    ]
+
+    const dataRows = guests.map((g) => [
+      g.full_name,
+      g.age_group,
+      g.status,
+      g.invited_by,
+      g.menu,
+      g.dietary_notes ?? '',
+    ])
+
+    const ws = XLSX.utils.aoa_to_sheet([HEADERS, HINTS, ...dataRows])
+    ws['!cols'] = [{ wch: 28 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 30 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Invitados')
+    XLSX.writeFile(wb, 'invitados-miboda.xlsx')
+  }
+
+  // ── Import ───────────────────────────────────────────────────────────────
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    const buffer = await file.arrayBuffer()
+    const wb = XLSX.read(buffer)
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const allRows = XLSX.utils.sheet_to_json(ws, { header: 1 })
+
+    // Skip header + hints rows (first 2), filter blank and hint rows
+    const parsed = allRows
+      .slice(1)
+      .filter((row) => row[0] && typeof row[0] === 'string' && !String(row[0]).startsWith('('))
+      .map((row) => ({
+        full_name:       String(row[0] ?? '').trim(),
+        age_group:       AGE_VALUES.includes(row[1])     ? row[1]     : 'adulto',
+        status:          STATUS_VALUES.includes(row[2])  ? row[2]     : 'pendiente',
+        invited_by:      INVITED_VALUES.includes(row[3]) ? row[3]     : 'ambas',
+        menu:            MENU_VALUES.includes(row[4])    ? row[4]     : 'adulto',
+        dietary_notes:   row[5] ? String(row[5]).trim() || null : null,
+        event_id:        eventId,
+      }))
+      .filter((g) => g.full_name)
+
+    if (parsed.length === 0) {
+      alert('No se encontraron filas válidas en el archivo.')
+      return
+    }
+    setImportRows(parsed)
+    setImportOpen(true)
+  }
+
+  async function handleImportConfirm() {
+    setImporting(true)
+    await supabase.from('guests').insert(importRows)
+    invalidate()
+    setImporting(false)
+    setImportOpen(false)
+    setImportRows([])
+  }
+
+  // ── Filters ──────────────────────────────────────────────────────────────
   const filtered = useMemo(() => guests.filter((g) => {
     if (filterStatus !== 'todos' && g.status !== filterStatus) return false
     if (filterAge !== 'todos' && g.age_group !== filterAge) return false
@@ -79,19 +202,44 @@ export default function GuestsPage() {
   return (
     <div className="min-h-full bg-surface">
 
-      {/* Page header */}
       <div className="bg-bordo px-5 pt-8 pb-5">
         <div className="flex items-end justify-between">
           <h1 className="font-serif text-white text-3xl">Invitados</h1>
-          <button
-            onClick={() => { setEditingGuest(null); setModalOpen(true) }}
-            className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-4 py-2 rounded-xl transition active:scale-95"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Agregar
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Exportar */}
+            <button
+              onClick={handleExport}
+              title="Exportar Excel"
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Excel
+            </button>
+            {/* Importar */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              title="Importar desde Excel"
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5m0 0L7.5 12m4.5-4.5V21" />
+              </svg>
+              Importar
+            </button>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+            {/* Agregar */}
+            <button
+              onClick={() => { setEditingGuest(null); setModalOpen(true) }}
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-medium px-3 py-2 rounded-xl transition active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Agregar
+            </button>
+          </div>
         </div>
       </div>
 
@@ -133,7 +281,7 @@ export default function GuestsPage() {
           ]} />
         </div>
 
-        {/* Lista — 1 col mobile, 2 col desktop */}
+        {/* Lista */}
         {isLoading ? (
           <p className="text-center text-ink-soft text-sm py-8 animate-pulse">Cargando invitados...</p>
         ) : filtered.length === 0 ? (
@@ -143,7 +291,7 @@ export default function GuestsPage() {
               {total === 0 ? 'Sin invitados todavía' : 'Sin resultados'}
             </p>
             <p className="text-sm text-ink-soft">
-              {total === 0 ? 'Tocá "+ Agregar" para sumar el primero' : 'Probá cambiando los filtros'}
+              {total === 0 ? 'Tocá "Agregar" o importá un Excel' : 'Probá cambiando los filtros'}
             </p>
           </div>
         ) : (
@@ -176,7 +324,15 @@ export default function GuestsPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         guest={editingGuest}
-        onSaved={handleSaved}
+        onSaved={invalidate}
+      />
+
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onConfirm={handleImportConfirm}
+        rows={importRows}
+        loading={importing}
       />
     </div>
   )
