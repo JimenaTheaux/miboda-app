@@ -9,7 +9,9 @@ const DEFAULTS = {
 }
 
 export default function GuestFormModal({ open, onClose, guest, onSaved }) {
-  const { eventId } = useAppStore()
+  const { eventId, event } = useAppStore()
+  const bride1 = event?.bride1_name || 'Novia 1'
+  const bride2 = event?.bride2_name || 'Novia 2'
   const isEditing = !!guest
 
   const { register, handleSubmit, reset, watch, setValue,
@@ -110,8 +112,8 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
             <div>
               <label className={labelCls}>Invitado por</label>
               <select {...register('invited_by')} className={selectCls}>
-                <option value="novia1">Novia 1</option>
-                <option value="novia2">Novia 2</option>
+                <option value="novia1">{bride1}</option>
+                <option value="novia2">{bride2}</option>
                 <option value="ambas">Ambas</option>
               </select>
             </div>

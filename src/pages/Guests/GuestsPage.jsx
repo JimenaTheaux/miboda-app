@@ -79,7 +79,9 @@ function ImportModal({ open, onClose, onConfirm, rows, loading }) {
 }
 
 export default function GuestsPage() {
-  const { eventId } = useAppStore()
+  const { eventId, event } = useAppStore()
+  const bride1 = event?.bride1_name || 'Novia 1'
+  const bride2 = event?.bride2_name || 'Novia 2'
   const queryClient = useQueryClient()
   const fileInputRef = useRef(null)
 
@@ -274,9 +276,9 @@ export default function GuestsPage() {
             { value: 'nino', label: 'Niños' },
           ]} />
           <FilterChips value={filterInvitedBy} onChange={setFilterInvitedBy} options={[
-            { value: 'todos', label: 'Por todos' },
-            { value: 'novia1', label: 'Novia 1' },
-            { value: 'novia2', label: 'Novia 2' },
+            { value: 'todos', label: 'Todos' },
+            { value: 'novia1', label: bride1 },
+            { value: 'novia2', label: bride2 },
             { value: 'ambas', label: 'Ambas' },
           ]} />
         </div>
