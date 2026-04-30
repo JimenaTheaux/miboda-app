@@ -3,11 +3,6 @@ import { useForm } from 'react-hook-form'
 import { supabase } from '../../lib/supabase'
 import useAppStore from '../../store/useAppStore'
 
-const DEFAULTS = {
-  full_name: '', age_group: 'adulto', status: 'pendiente',
-  invited_by: 'ambas', menu: 'adulto', dietary_notes: '',
-}
-
 export const PRESET_CATS = [
   { value: 'familia',        label: 'Familia' },
   { value: 'amigos',         label: 'Amigos' },
@@ -17,65 +12,79 @@ export const PRESET_CATS = [
 ]
 const PRESET_VALUES = PRESET_CATS.map((c) => c.value)
 
+function PillGroup({ options, value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 ${
+            value === opt.value
+              ? 'bg-bordo text-white border-bordo shadow-sm'
+              : 'bg-surface border-border text-ink-soft hover:border-bordo-light hover:text-ink'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function GuestFormModal({ open, onClose, guest, onSaved }) {
   const { eventId, event } = useAppStore()
   const bride1 = event?.bride1_name || 'Novia 1'
   const bride2 = event?.bride2_name || 'Novia 2'
-
-  const { register, handleSubmit, reset, watch, setValue,
-    formState: { errors, isSubmitting } } = useForm({ defaultValues: DEFAULTS })
-
-  const [catValue, setCatValue]     = useState('')
-  const [customCat, setCustomCat]   = useState('')
-  const [showCustom, setShowCustom] = useState(false)
-
-  const ageGroup = watch('age_group')
   const isEditing = !!guest
+
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm()
+
+  const [ageGroup,   setAgeGroup]   = useState('adulto')
+  const [status,     setStatus]     = useState('pendiente')
+  const [invitedBy,  setInvitedBy]  = useState('ambas')
+  const [menu,       setMenu]       = useState('adulto')
+  const [catValue,   setCatValue]   = useState('')
+  const [customCat,  setCustomCat]  = useState('')
+  const [showCustom, setShowCustom] = useState(false)
 
   useEffect(() => {
     if (!open) return
-    reset(guest ? {
-      full_name: guest.full_name, age_group: guest.age_group, status: guest.status,
-      invited_by: guest.invited_by, menu: guest.menu, dietary_notes: guest.dietary_notes ?? '',
-    } : DEFAULTS)
+    reset({
+      full_name:      guest?.full_name      ?? '',
+      dietary_notes:  guest?.dietary_notes  ?? '',
+    })
+    setAgeGroup(guest?.age_group  || 'adulto')
+    setStatus(guest?.status       || 'pendiente')
+    setInvitedBy(guest?.invited_by || 'ambas')
+    setMenu(guest?.menu            || 'adulto')
 
     const cat = guest?.category ?? ''
     if (cat && !PRESET_VALUES.includes(cat)) {
-      setCatValue('__custom__')
-      setShowCustom(true)
-      setCustomCat(cat)
+      setCatValue('__custom__'); setShowCustom(true); setCustomCat(cat)
     } else {
-      setCatValue(cat)
-      setShowCustom(false)
-      setCustomCat('')
+      setCatValue(cat); setShowCustom(false); setCustomCat('')
     }
   }, [open, guest])
 
   useEffect(() => {
-    if (ageGroup === 'nino') setValue('menu', 'infantil')
-    else setValue('menu', 'adulto')
+    if (ageGroup === 'nino') setMenu('infantil')
   }, [ageGroup])
 
-  function handleCatChange(e) {
-    const val = e.target.value
-    setCatValue(val)
-    setShowCustom(val === '__custom__')
-    if (val !== '__custom__') setCustomCat('')
-  }
-
   async function onSubmit(data) {
-    const category = showCustom
-      ? (customCat.trim() || null)
-      : (catValue || null)
-
+    const category = showCustom ? (customCat.trim() || null) : (catValue || null)
     const payload = {
-      full_name: data.full_name.trim(), age_group: data.age_group,
-      status: data.status, invited_by: data.invited_by, menu: data.menu,
-      dietary_notes: data.dietary_notes?.trim() || null,
+      full_name:      data.full_name.trim(),
+      dietary_notes:  data.dietary_notes?.trim() || null,
+      age_group:      ageGroup,
+      status,
+      invited_by:     invitedBy,
+      menu,
       category,
     }
     if (isEditing) await supabase.from('guests').update(payload).eq('id', guest.id)
-    else await supabase.from('guests').insert({ ...payload, event_id: eventId })
+    else            await supabase.from('guests').insert({ ...payload, event_id: eventId })
     onSaved(); onClose()
   }
 
@@ -85,8 +94,7 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
     onSaved(); onClose()
   }
 
-  const labelCls = 'block text-sm font-medium text-ink-mid mb-1.5'
-  const selectCls = 'input-base appearance-none'
+  const lbl = 'block text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-2'
 
   return (
     <div className={`fixed inset-0 z-[60] ${open ? '' : 'pointer-events-none'}`}>
@@ -114,82 +122,108 @@ export default function GuestFormModal({ open, onClose, guest, onSaved }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="px-5 py-4 space-y-4 pb-14">
+        <form onSubmit={handleSubmit(onSubmit)} className="px-5 py-4 space-y-5 pb-14">
 
+          {/* Nombre */}
           <div>
-            <label className={labelCls}>Nombre completo</label>
-            <input {...register('full_name', { required: 'Ingresá el nombre' })}
-              type="text" placeholder="Ana García" className="input-base" />
-            {errors.full_name && <p className="text-red-500 text-xs mt-1">{errors.full_name.message}</p>}
+            <label className={lbl}>Nombre completo</label>
+            <input
+              {...register('full_name', { required: 'Ingresá el nombre' })}
+              type="text" placeholder="Ana García" className="input-base"
+            />
+            {errors.full_name && (
+              <p className="text-red-500 text-xs mt-1">{errors.full_name.message}</p>
+            )}
+          </div>
+
+          {/* Estado */}
+          <div>
+            <label className={lbl}>Estado</label>
+            <PillGroup value={status} onChange={setStatus} options={[
+              { value: 'pendiente',  label: '· Pendiente' },
+              { value: 'confirmado', label: '✓ Confirmado' },
+              { value: 'no_asiste',  label: '✕ No asiste' },
+            ]} />
           </div>
 
           {/* Categoría */}
           <div>
-            <label className={labelCls}>Categoría</label>
-            <select value={catValue} onChange={handleCatChange} className={selectCls}>
-              <option value="">Sin categoría</option>
+            <label className={lbl}>Categoría</label>
+            <div className="flex flex-wrap gap-1.5">
               {PRESET_CATS.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+                <button key={c.value} type="button"
+                  onClick={() => { setCatValue(c.value); setShowCustom(false); setCustomCat('') }}
+                  className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 ${
+                    catValue === c.value && !showCustom
+                      ? 'bg-bordo text-white border-bordo shadow-sm'
+                      : 'bg-surface border-border text-ink-soft hover:border-bordo-light hover:text-ink'
+                  }`}>
+                  {c.label}
+                </button>
               ))}
-              <option value="__custom__">Otra categoría...</option>
-            </select>
+              <button type="button"
+                onClick={() => { setCatValue('__custom__'); setShowCustom(true) }}
+                className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 ${
+                  showCustom
+                    ? 'bg-bordo text-white border-bordo shadow-sm'
+                    : 'bg-surface border-border text-ink-soft hover:border-bordo-light'
+                }`}>
+                + Otra
+              </button>
+              {(catValue || showCustom) && (
+                <button type="button"
+                  onClick={() => { setCatValue(''); setShowCustom(false); setCustomCat('') }}
+                  className="px-2.5 py-2 rounded-xl text-xs border border-border text-ink-soft hover:text-red-400 transition">
+                  ✕
+                </button>
+              )}
+            </div>
             {showCustom && (
-              <input
-                type="text"
-                value={customCat}
-                onChange={(e) => setCustomCat(e.target.value)}
-                placeholder="Escribí la categoría"
-                className="input-base mt-2"
-                autoFocus
-              />
+              <input type="text" value={customCat} onChange={(e) => setCustomCat(e.target.value)}
+                placeholder="Escribí la categoría" className="input-base mt-2" autoFocus />
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Edad</label>
-              <select {...register('age_group')} className={selectCls}>
-                <option value="adulto">Adulto</option>
-                <option value="adolescente">Adolescente</option>
-                <option value="nino">Niño</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Estado</label>
-              <select {...register('status')} className={selectCls}>
-                <option value="pendiente">Pendiente</option>
-                <option value="confirmado">Confirmado</option>
-                <option value="no_asiste">No asiste</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Invitado por</label>
-              <select {...register('invited_by')} className={selectCls}>
-                <option value="novia1">{bride1}</option>
-                <option value="novia2">{bride2}</option>
-                <option value="ambas">Ambas</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Menú</label>
-              <select {...register('menu')} className={selectCls}>
-                <option value="adulto">Adulto</option>
-                <option value="infantil">Infantil</option>
-              </select>
-            </div>
-          </div>
-
+          {/* Edad */}
           <div>
-            <label className={labelCls}>
+            <label className={lbl}>Edad</label>
+            <PillGroup value={ageGroup} onChange={setAgeGroup} options={[
+              { value: 'adulto',      label: 'Adulto' },
+              { value: 'adolescente', label: 'Adolescente' },
+              { value: 'nino',        label: 'Niño / Niña' },
+            ]} />
+          </div>
+
+          {/* Invitado por */}
+          <div>
+            <label className={lbl}>Invitado por</label>
+            <PillGroup value={invitedBy} onChange={setInvitedBy} options={[
+              { value: 'novia1', label: bride1 },
+              { value: 'novia2', label: bride2 },
+              { value: 'ambas',  label: 'Ambas' },
+            ]} />
+          </div>
+
+          {/* Menú */}
+          <div>
+            <label className={lbl}>Menú</label>
+            <PillGroup value={menu} onChange={setMenu} options={[
+              { value: 'adulto',   label: 'Adulto' },
+              { value: 'infantil', label: 'Infantil' },
+            ]} />
+          </div>
+
+          {/* Restricciones */}
+          <div>
+            <label className={lbl}>
               Restricciones alimentarias{' '}
-              <span className="font-normal text-ink-soft">(opcional)</span>
+              <span className="normal-case font-normal text-ink-soft">(opcional)</span>
             </label>
-            <textarea {...register('dietary_notes')}
+            <textarea
+              {...register('dietary_notes')}
               placeholder="Vegano, celíaco, alérgico a nueces..."
-              rows={2} className="input-base resize-none" />
+              rows={2} className="input-base resize-none"
+            />
           </div>
 
           <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
