@@ -63,6 +63,40 @@ function FilterChips({ options, value, onChange }) {
   )
 }
 
+function dueDateBadge(due_date, completed) {
+  if (!due_date || completed) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(due_date + 'T00:00:00')
+  const diffDays = Math.round((due - today) / 86400000)
+
+  if (diffDays < 0)
+    return { label: 'Vencida', cls: 'bg-red-100 text-red-600 border-red-200' }
+  if (diffDays === 0)
+    return { label: 'Hoy', cls: 'bg-red-50 text-red-500 border-red-100' }
+  if (diffDays <= 7)
+    return { label: `${diffDays}d`, cls: 'bg-gold/10 text-gold border-gold/20' }
+  return {
+    label: due.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }),
+    cls: 'bg-surface-2 text-ink-soft border-border',
+  }
+}
+
+function getDateBucket(due_date) {
+  if (!due_date) return 'Sin fecha'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(due_date + 'T00:00:00')
+  const diffDays = Math.round((due - today) / 86400000)
+  if (diffDays < 0)  return 'Vencidas'
+  if (diffDays === 0) return 'Hoy'
+  if (diffDays <= 7)  return 'Esta semana'
+  if (diffDays <= 30) return 'Este mes'
+  return 'Más adelante'
+}
+
+const DATE_BUCKET_ORDER = ['Vencidas', 'Hoy', 'Esta semana', 'Este mes', 'Más adelante', 'Sin fecha']
+
 export default function ChecklistPage() {
   const { eventId, event } = useAppStore()
   const queryClient = useQueryClient()
@@ -71,6 +105,7 @@ export default function ChecklistPage() {
   const [filterStatus, setFilterStatus]   = useState('todas')
   const [filterCat, setFilterCat]         = useState('todas')
   const [filterAssign, setFilterAssign]   = useState('todas')
+  const [sortBy, setSortBy]               = useState('categoria')
   const [loadingTemplate, setLoadingTemplate] = useState(false)
 
   const { data: items = [], isLoading } = useQuery({
@@ -140,6 +175,23 @@ export default function ChecklistPage() {
   }), [items, filterStatus, filterCat, filterAssign])
 
   const grouped = useMemo(() => {
+    if (sortBy === 'fecha') {
+      const byBucket = {}
+      const sorted = [...filtered].sort((a, b) => {
+        if (!a.due_date && !b.due_date) return 0
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return a.due_date.localeCompare(b.due_date)
+      })
+      sorted.forEach((item) => {
+        const bucket = getDateBucket(item.due_date)
+        if (!byBucket[bucket]) byBucket[bucket] = []
+        byBucket[bucket].push(item)
+      })
+      const ordered = {}
+      DATE_BUCKET_ORDER.forEach((b) => { if (byBucket[b]) ordered[b] = byBucket[b] })
+      return ordered
+    }
     if (filterCat !== 'todas') return { [filterCat]: filtered }
     return filtered.reduce((acc, item) => {
       const key = item.category || 'Sin categoría'
@@ -147,7 +199,7 @@ export default function ChecklistPage() {
       acc[key].push(item)
       return acc
     }, {})
-  }, [filtered, filterCat])
+  }, [filtered, filterCat, sortBy])
 
   const bride1 = event?.bride1_name || 'Novia 1'
   const bride2 = event?.bride2_name || 'Novia 2'
@@ -211,7 +263,7 @@ export default function ChecklistPage() {
           ))}
         </div>
 
-        <div className="space-y-2 mb-5">
+        <div className="space-y-2 mb-4">
           <FilterChips value={filterStatus} onChange={setFilterStatus} options={[
             { value: 'todas',       label: 'Todas' },
             { value: 'pendientes',  label: 'Pendientes' },
@@ -221,6 +273,35 @@ export default function ChecklistPage() {
           {catOptions.length > 2 && (
             <FilterChips value={filterCat} onChange={setFilterCat} options={catOptions} />
           )}
+        </div>
+
+        <div className="flex gap-2 mb-5">
+          <button
+            onClick={() => setSortBy('categoria')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+              sortBy === 'categoria'
+                ? 'bg-bordo text-white border-bordo'
+                : 'bg-surface border-border text-ink-soft hover:text-ink'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+            </svg>
+            Categoría
+          </button>
+          <button
+            onClick={() => setSortBy('fecha')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+              sortBy === 'fecha'
+                ? 'bg-bordo text-white border-bordo'
+                : 'bg-surface border-border text-ink-soft hover:text-ink'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+            </svg>
+            Fecha límite
+          </button>
         </div>
 
         {isLoading ? (
@@ -249,18 +330,21 @@ export default function ChecklistPage() {
           </div>
         ) : (
           <div className="md:grid md:grid-cols-2 md:gap-x-6 md:items-start">
-            {Object.entries(grouped).map(([cat, catItems]) => (
-              <div key={cat} className="mb-4">
+            {Object.entries(grouped).map(([groupKey, groupItems]) => (
+              <div key={groupKey} className="mb-4">
                 {Object.keys(grouped).length > 1 && (
-                  <p className="text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-2 px-1">
-                    {cat}
+                  <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 px-1 ${
+                    groupKey === 'Vencidas' ? 'text-red-500' : 'text-ink-soft'
+                  }`}>
+                    {groupKey}
                   </p>
                 )}
                 <div className="space-y-2">
-                  {catItems.map((item) => {
-                    const assignKey = item.assigned_to || 'ambas'
+                  {groupItems.map((item) => {
+                    const assignKey  = item.assigned_to || 'ambas'
                     const assignName = assignKey === 'novia1' ? bride1 : assignKey === 'novia2' ? bride2 : null
                     const assignCls  = ASSIGN_COLORS[assignKey] ?? null
+                    const dateBadge  = dueDateBadge(item.due_date, item.completed)
                     return (
                       <div
                         key={item.id}
@@ -292,6 +376,11 @@ export default function ChecklistPage() {
                           </div>
                           {item.notes && (
                             <p className="text-xs text-ink-soft mt-0.5 leading-snug">{item.notes}</p>
+                          )}
+                          {dateBadge && (
+                            <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-md border mt-1 ${dateBadge.cls}`}>
+                              {dateBadge.label}
+                            </span>
                           )}
                         </div>
 

@@ -1,15 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <rect width="100" height="100" rx="22" fill="#5C1F2E"/>
-  <g transform="translate(50,50)">
-    <!-- 6 petals -->
-    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(0)"/>
-    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(60)"/>
-    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(120)"/>
-    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(180)"/>
-    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(240)"/>
-    <path d="M0,4 C11,-7 11,-21 0,-29 C-11,-21 -11,-7 0,4" fill="#FDFAF6" opacity="0.93" transform="rotate(300)"/>
-    <!-- Centro dorado -->
-    <circle cx="0" cy="0" r="10" fill="#B8965A"/>
-    <circle cx="0" cy="0" r="5" fill="#FDFAF6" opacity="0.45"/>
+  <!-- stems -->
+  <line x1="50" y1="72" x2="35" y2="45" stroke="#6B8070" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="50" y1="72" x2="50" y2="38" stroke="#6B8070" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="50" y1="72" x2="65" y2="45" stroke="#6B8070" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- leaves -->
+  <path d="M42,58 Q33,52 36,44 Q42,50 42,58Z" fill="#6B8070" opacity="0.85"/>
+  <path d="M58,58 Q67,52 64,44 Q58,50 58,58Z" fill="#6B8070" opacity="0.85"/>
+  <!-- ribbon -->
+  <path d="M44,74 Q50,70 56,74 Q50,80 44,74Z" fill="#B8965A" opacity="0.9"/>
+  <path d="M44,74 Q40,76 38,73 Q42,70 44,74Z" fill="#B8965A" opacity="0.75"/>
+  <path d="M56,74 Q60,76 62,73 Q58,70 56,74Z" fill="#B8965A" opacity="0.75"/>
+  <!-- left flower -->
+  <g transform="translate(35,41)">
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(0)"/>
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(72)"/>
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(144)"/>
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(216)"/>
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(288)"/>
+    <circle cx="0" cy="0" r="5" fill="#B8965A"/>
+  </g>
+  <!-- center flower (taller) -->
+  <g transform="translate(50,34)">
+    <path d="M0,2.5 C6,-4 6,-13 0,-17 C-6,-13 -6,-4 0,2.5" fill="#FDFAF6" opacity="0.95" transform="rotate(0)"/>
+    <path d="M0,2.5 C6,-4 6,-13 0,-17 C-6,-13 -6,-4 0,2.5" fill="#FDFAF6" opacity="0.95" transform="rotate(60)"/>
+    <path d="M0,2.5 C6,-4 6,-13 0,-17 C-6,-13 -6,-4 0,2.5" fill="#FDFAF6" opacity="0.95" transform="rotate(120)"/>
+    <path d="M0,2.5 C6,-4 6,-13 0,-17 C-6,-13 -6,-4 0,2.5" fill="#FDFAF6" opacity="0.95" transform="rotate(180)"/>
+    <path d="M0,2.5 C6,-4 6,-13 0,-17 C-6,-13 -6,-4 0,2.5" fill="#FDFAF6" opacity="0.95" transform="rotate(240)"/>
+    <path d="M0,2.5 C6,-4 6,-13 0,-17 C-6,-13 -6,-4 0,2.5" fill="#FDFAF6" opacity="0.95" transform="rotate(300)"/>
+    <circle cx="0" cy="0" r="6" fill="#B8965A"/>
+    <circle cx="0" cy="0" r="3" fill="#FDFAF6" opacity="0.5"/>
+  </g>
+  <!-- right flower -->
+  <g transform="translate(65,41)">
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(0)"/>
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(72)"/>
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(144)"/>
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(216)"/>
+    <path d="M0,2 C5,-3 5,-10 0,-14 C-5,-10 -5,-3 0,2" fill="#FDFAF6" opacity="0.9" transform="rotate(288)"/>
+    <circle cx="0" cy="0" r="5" fill="#B8965A"/>
   </g>
 </svg>

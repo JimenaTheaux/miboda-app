@@ -22,8 +22,9 @@ export default function ChecklistItemFormModal({ open, onClose, item, onSaved, b
             category:    item.category ?? '',
             notes:       item.notes ?? '',
             assigned_to: item.assigned_to ?? 'ambas',
+            due_date:    item.due_date ?? '',
           }
-        : { title: '', category: '', notes: '', assigned_to: 'ambas' }
+        : { title: '', category: '', notes: '', assigned_to: 'ambas', due_date: '' }
       )
     }
   }, [open, item])
@@ -36,6 +37,7 @@ export default function ChecklistItemFormModal({ open, onClose, item, onSaved, b
       category:    values.category?.trim() || null,
       notes:       values.notes?.trim()    || null,
       assigned_to: values.assigned_to || 'ambas',
+      due_date:    values.due_date || null,
     }
     let error
     if (item) {
@@ -109,6 +111,15 @@ export default function ChecklistItemFormModal({ open, onClose, item, onSaved, b
                 </label>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-soft mb-1.5">Fecha límite (opcional)</label>
+            <input
+              type="date"
+              className="input-base"
+              {...register('due_date')}
+            />
           </div>
 
           <div>
